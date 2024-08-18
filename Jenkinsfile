@@ -45,4 +45,10 @@ pipeline {
                 sh "npm install"
             }
         }
-        stage('TRIVY FS SCAN') 
+        stage('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
+            }
+        }
+    } // Closing stages block
+} // Closing pipeline block

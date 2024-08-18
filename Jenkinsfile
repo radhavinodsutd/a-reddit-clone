@@ -1,9 +1,11 @@
 pipeline {
     agent any
+
     tools {
         jdk 'jdk17'
         nodejs 'node16'
     }
+
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
         APP_NAME = "reddit-clone-pipeline"
@@ -14,18 +16,21 @@ pipeline {
         IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
         JENKINS_API_TOKEN = credentials("JENKINS_API_TOKEN")
     }
+
     stages {
-        stage('clean workspace') {
+        stage('Clean Workspace') {
             steps {
                 cleanWs()
             }
         }
+        
         stage('Checkout from Git') {
             steps {
                 git branch: 'main', url: 'https://github.com/Ashfaque-9x/a-reddit-clone.git'
             }
         }
-        stage("Sonarqube Analysis") {
+        
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube-Server') {
                     sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=Reddit-Clone-CI \
@@ -33,22 +38,39 @@ pipeline {
                 }
             }
         }
-        stage("Quality Gate") {
+        
+        stage('Quality Gate') {
             steps {
                 script {
                     waitForQualityGate abortPipeline: false, credentialsId: 'SonarQube-Token'
                 }
             }
         }
+        
         stage('Install Dependencies') {
             steps {
                 sh "npm install"
             }
         }
-        stage('TRIVY FS SCAN') {
+        
+        stage('Trivy FS Scan') {
             steps {
                 sh "trivy fs . > trivyfs.txt"
             }
         }
-    } // Closing stages block
-} // Closing pipeline block
+        
+        stage('Build & Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('', DOCKER_PASS) {
+                        docker_image = docker.build("${IMAGE_NAME}")
+                    }
+                    docker.withRegistry('', DOCKER_PASS) {
+                        docker_image.push("${IMAGE_TAG}")
+                        docker_image.push('latest')
+                    }
+                }
+            }
+        }
+    }
+}
